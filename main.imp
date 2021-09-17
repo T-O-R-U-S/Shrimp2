@@ -1,0 +1,11 @@
+@main (args) {
+	print "Hello \" world!";
+	print "Greetings!";
+	print $var;
+	print "Other";
+	print "Hello world!";
+}
+
+@second (arg1 arg2) {
+	print "Greetings!"
+}
