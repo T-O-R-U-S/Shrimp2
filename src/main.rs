@@ -128,7 +128,7 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 					word.push(line.current_char.unwrap());
 					line.advance();
 					if line.current_char.is_none() {
-						break
+						bail!(Error::UnexpectedEOL)
 					}
 				}
 
@@ -226,7 +226,7 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 
 				let n_tokens = make_tokens(Line::new(word, 0));
 
-				tokens.push(Token::Codeblock(n_tokens.unwrap()))
+				tokens.push(Token::Codeblock(n_tokens?))
 			}
 
 			'@' => tokens.push(Token::FunctionDecl),
@@ -278,9 +278,9 @@ fn main() -> anyErr<()> {
 
 	let lexer = Lexer::new(code, 0);
 
-	let tokens = lexer.make_tokens().unwrap();
+	let tokens = lexer.make_tokens()?;
 
-	run(funcs(tokens).unwrap())
+	run(funcs(tokens)?)
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -328,7 +328,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 	}
 
 	match functions.get(&"main".to_string()) {
-		Some(func) => {
+		Some(_) => {
 			Ok(functions)
 		}
 		None => bail!(Error::NoMain)

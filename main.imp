@@ -4,6 +4,7 @@
 	print $var;
 	print "Other";
 	print "Hello world!";
+	print "";
 }
 
 @second (arg1 arg2) {
