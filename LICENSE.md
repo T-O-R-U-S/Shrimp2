@@ -2,7 +2,7 @@
 
 ## by T-O-R-U-S, on [Github](HTTPS://WWW.GITHUB.COM). **2021**
 
-<Version 0.0.7>
+<Version 0.0.8>
 
 
 By "author", here I mean any maintainer of the software, contributors, collaborators or owner(s)
@@ -16,7 +16,7 @@ By "software", here I mean any (programming) library, compiled code, or source c
   4. Cracking any kind of code meant to encrypt any kind of data and/or information
   5. Usage of this software to mislead others
   6. Usage of this software to train ANY form of AI is strictly prohibited. 
-     - All clauses about closed-source software also apply to AI (all forms of artificial intelligence, hand-programmed as well as neural networks) in this license.
+     - All clauses about closed or open source software also apply to AI (all forms of artificial intelligence, hand-programmed as well as neural networks) in this license.
   7. Usage of this software to aid in illicit activity.
 
 - You may not re-distribute this software without including any notices and/or disclaimers that the author has originally included anywhere in their software, software repository or software installer.
