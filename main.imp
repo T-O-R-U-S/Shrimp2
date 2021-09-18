@@ -1,10 +1,12 @@
-@main (args) {
+@main (cmd_args) {
 	print "Hello \" world!";
+	print "Hi!" 33;
 	print "Greetings!";
 	print $var;
 	print "Other";
-	print "Hello world!";
+	print "Hello  world!" "Hello world!";
 	print "";
+	declare $hello_world "Your mother.";
 }
 
 @second (arg1 arg2) {
