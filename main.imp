@@ -4,7 +4,7 @@
 	print "Greetings!";
 	print $var;
 	print "Other";
-	print "Hello  world!" "Hello world!";
+	print "Hello  world!" "Hello world!" [33 33 33];
 	print "";
 	declare $hello_world "Your mother.";
 }

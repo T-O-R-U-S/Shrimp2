@@ -261,6 +261,7 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 					}
 					line.advance()
 				}
+				line.retreat();
 
 				let n_tokens = make_tokens(Line::new(word, line.line_num));
 
@@ -276,13 +277,13 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 				while brack_count > 0 {
 					match line.current_char {
 						Some(chr) => match chr {
-							'[' => {
+							']' => {
 								if brack_count > 1 {
 									word.push(']')
 								}
 								brack_count -= 1;
 							}
-							']' => {
+							'[' => {
 								brack_count += 1;
 								word.push('[')
 							}
@@ -292,6 +293,7 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 					}
 					line.advance()
 				}
+				line.retreat();
 
 				let n_tokens = make_tokens(Line::new(word, line.line_num));
 
@@ -323,6 +325,7 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 					}
 					line.advance()
 				}
+				line.retreat();
 
 				let n_tokens = make_tokens(Line::new(word, line.line_num));
 
