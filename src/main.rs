@@ -338,7 +338,16 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 
 			'@' => tokens.push(Token::FunctionDecl),
 
-			'/' => {}
+			'/' => {
+				line.advance();
+				while line.current_char != Some('/') {
+					if line.current_char.is_none() {
+						bail!(Error::UnexpectedEOL)
+					}
+					line.advance();
+				}
+				line.advance()
+			}
 
 			';' => tokens.push(Token::LineEnd),
 			c if c.is_whitespace() => {}
@@ -559,15 +568,8 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 	Ok(functions)
 }
 
-pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
-	let mut variables = HashMap::<String, Token>::new();
-
-	// Naming this variable "main" will overwrite the main fn
-	let shrimp_main = functions.get(&"main".to_string()).unwrap().clone();
-
-	println!("{:?}", shrimp_main);
-
-	match shrimp_main.instructions {
+pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functions: HashMap<String, Function>) -> anyErr<(HashMap<String, Token>, HashMap<String, Function>)> {
+	match func.instructions {
 		Token::Codeblock(val) => {
 			let mut instructions = val.into_iter().peekable();
 			while let Some(val) = instructions.next() {
@@ -583,6 +585,12 @@ pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
 										},
 										Err(err) => bail!(err)
 									}
+									Token::Codeblock(code) => {
+										let out = try_or_bail!(execute(func.clone(), variables.clone(), functions.clone()));
+										// TODO: Once destructuring gets stabilized, use it here.
+										variables = out.0;
+										functions = out.1;
+									},
 									any => bail!(Error::UnexpectedToken(any))
 								}
 							},
@@ -596,5 +604,53 @@ pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
 		any => bail!(Error::UnexpectedToken(any))
 	}
 
-	Ok(())
+	Ok((variables, functions))
+}
+
+pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
+	let mut variables = HashMap::<String, Token>::new();
+
+	// Naming this variable "main" will overwrite the main fn
+	let shrimp_main = functions.get(&"main".to_string()).unwrap().clone();
+
+	println!("{:?}", shrimp_main);
+
+	match execute(shrimp_main, variables, functions) {
+		Ok(_) => Ok(()),
+		Err(any) => bail!(any)
+	}
+
+	/*match shrimp_main.instructions {
+		Token::Codeblock(val) => {
+			let mut instructions = val.into_iter().peekable();
+			while let Some(val) = instructions.next() {
+				match val {
+					Token::Ident(name) => {
+						match functions.get(&name) {
+							Some(func) => {
+								match func.instructions.clone() {
+									Token::Native(fun) => match fun(variables.clone(), instructions.clone()) {
+										Ok((vars, iterator)) => {
+											instructions = iterator;
+											variables = vars;
+										},
+										Err(err) => bail!(err)
+									}
+									Token::Codeblock(code) => {
+										
+									}
+									any => bail!(Error::UnexpectedToken(any))
+								}
+							},
+							None => bail!(Error::UnexpectedEOL)
+						}
+					}
+					x => bail!(Error::UnexpectedToken(x))
+				}
+			}
+		}
+		any => bail!(Error::UnexpectedToken(any))
+	}
+
+	Ok(())*/
 }

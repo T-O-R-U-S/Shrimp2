@@ -2,7 +2,7 @@
 	declare $var "Variable!";
 	/ This will declare a nameless variable
 	  that will return 0i32. /
-	declare $0;
+	print "Hello";
 	print "Hello \" world!";
 	print "Hi!" 33;
 	print "Greetings!";
@@ -10,7 +10,9 @@
 	print "Other";
 	print "Hello  world!" "Hello world!" [33 33 33];
 	print "";
-	declare $hello_world "Your mother.";
+	declare $hello_world "Test.";
+	print $hello_world;
+	second
 }
 
 @second (arg1 arg2) {
