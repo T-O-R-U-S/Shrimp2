@@ -338,6 +338,8 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 
 			'@' => tokens.push(Token::FunctionDecl),
 
+			'/' => {}
+
 			';' => tokens.push(Token::LineEnd),
 			c if c.is_whitespace() => {}
 			'\\' => {}
@@ -530,13 +532,11 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 						functions.insert(
 							ident,
 							Function {
-								arguments: if let Some(Token::Group(inner)) = tokens.next() {
-									FunctionArgs { arg_name: inner, args: vec![] }
-								} else {
-									bail!(Error::ExpectedToken {
-										expected: Token::Group(vec![Token::Ident("Your function here".to_string())]),
-										found: Token::Ident(ident)
-									})
+								arguments:
+								match tokens.next() {
+									Some(Token::Group(inner)) => FunctionArgs { arg_name: inner, args: vec![] },
+									Some(token) => bail!(Error::UnexpectedToken(token)),
+									None => bail!(Error::UnexpectedEOL)
 								},
 								instructions: tokens.next().unwrap(),
 							},
