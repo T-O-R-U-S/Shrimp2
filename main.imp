@@ -12,7 +12,7 @@
 	print "";
 	declare $hello_world "Test.";
 	print $hello_world;
-	second "Hello world" "test" 1234;
+	second "Hello world" "test";
 }
 
 @second(arg1 arg2) {

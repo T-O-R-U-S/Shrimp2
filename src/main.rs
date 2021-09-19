@@ -586,29 +586,20 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 										},
 										Err(err) => bail!(err)
 									}
-									Token::Codeblock(_code) => {
-										let mut temp_vars: Vec<String> = vec![];
+									Token::Codeblock(_) => {
+										let mut temp_vars = vec![];
 
-										let mut args = func.arguments.arg_name.iter();
+										let mut args = func.arguments.arg_name.clone().iter();
 
-										// while let Some(thing) = args.next() {}
-										while let Some(token) = args.next() {
-											match token {
-												Token::LineEnd => break,
-												x => {
-													
-												}
-											}
-										}
-										/*while Some(&Token::LineEnd) != args.next() {
+										for i in func.arguments.arg_name.clone() {
 											temp_vars.push(i.to_string().clone());
 											variables.insert(i.to_string(), match instructions.next() {
 												Some(Token::LineEnd) => bail!(Error::UnexpectedEOL),
 												Some(thing) => thing,
 												None => bail!(Error::UnexpectedEOL)
 											});
-										}*/
-										println!("{} {}", temp_vars.len(), func.arguments.arg_name.len());
+										}
+										instructions.next();
 										if temp_vars.len() != func.arguments.arg_name.len() {
 											bail!(Error::MalformedArgs)
 										}
