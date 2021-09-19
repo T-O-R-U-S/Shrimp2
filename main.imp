@@ -12,11 +12,11 @@
 	print "";
 	declare $hello_world "Test.";
 	print $hello_world;
-	second
+	second "Hello world" "test" 1234;
 }
 
 @second(arg1 arg2) {
-	print "Greetings!";
+	print $arg1 $arg2;
 }
 
 @arguments(arg1 arg2) {
