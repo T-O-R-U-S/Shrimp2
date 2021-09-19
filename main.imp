@@ -8,7 +8,7 @@
 	print "Greetings!";
 	print $var;
 	print "Other";
-	print "Hello  world!" "Hello world!" [33 33 33];
+	print "Hello  world!" "Hello world!" [33 33 33 "Test"];
 	print "";
 	declare $hello_world "Test.";
 	print $hello_world;

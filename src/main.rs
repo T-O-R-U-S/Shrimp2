@@ -569,7 +569,8 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 	Ok(functions)
 }
 
-pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functions: HashMap<String, Function>) -> anyErr<(HashMap<String, Token>, HashMap<String, Function>)> {
+pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functions: HashMap<String, Function>) -> anyErr<(HashMap<String, Token>, HashMap<String, Function>, Option<Token>)> {
+	let mut output = None;
 	match func.instructions {
 		Token::Codeblock(val) => {
 			let mut instructions = val.into_iter().peekable();
@@ -599,6 +600,7 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 												None => bail!(Error::UnexpectedEOL)
 											});
 										}
+
 										instructions.next();
 										if temp_vars.len() != func.arguments.arg_name.len() {
 											bail!(Error::MalformedArgs)
@@ -608,6 +610,7 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 										// TODO: Once destructuring gets stabilized, use it here.
 										variables = out.0;
 										functions = out.1;
+										output = out.2;
 										for i in temp_vars {
 											variables.remove(&i);
 										}
@@ -625,7 +628,7 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 		any => bail!(Error::UnexpectedToken(any))
 	}
 
-	Ok((variables, functions))
+	Ok((variables, functions, output))
 }
 
 pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
