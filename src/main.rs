@@ -606,7 +606,6 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 										instructions.next();
 										let out = try_or_bail!(execute(func.clone(), variables.clone(), functions.clone()));
 										// TODO: Once destructuring gets stabilized, use it here.
-										// TODO: Implement named arguments
 										variables = out.0;
 										functions = out.1;
 										for i in temp_vars {
