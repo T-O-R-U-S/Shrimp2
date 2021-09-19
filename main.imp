@@ -1,4 +1,6 @@
 @main (cmd_args) {
+	declare $var "Variable!";
+	declare $0 "Var";
 	print "Hello \" world!";
 	print "Hi!" 33;
 	print "Greetings!";

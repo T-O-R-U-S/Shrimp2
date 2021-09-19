@@ -31,6 +31,10 @@ pub enum Error {
 	NoMain,
 	#[error("Unexpected end of line")]
 	UnexpectedEOL,
+	#[error("Unknown variable accessed")]
+	UnknownVar,
+	#[error("Incorrect amount of arguments provided")]
+	MalformedArgs
 }
 
 impl std::fmt::Display for Token {
@@ -93,7 +97,7 @@ pub enum Token {
 	Codeblock(Vec<Token>),
 	Array(Vec<Token>),
 	VarAccessor(String),
-	Native(fn(Vec<Token>, std::iter::Peekable<std::vec::IntoIter<Token>>) -> anyErr<std::iter::Peekable<std::vec::IntoIter<Token>>>),
+	Native(fn(HashMap<String, Token>, std::iter::Peekable<std::vec::IntoIter<Token>>) -> anyErr<(HashMap<String, Token>, std::iter::Peekable<std::vec::IntoIter<Token>>)>),
 }
 
 pub struct Line {
@@ -393,15 +397,39 @@ fn main() -> anyErr<()> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FunctionArgs {
+	arg_name: Vec<Token>,
+	args: Vec<Token>
+}
+
+impl FunctionArgs {
+	pub fn validate(self) -> anyErr<Self> {
+		if self.arg_name.len() > self.args.len() || self.arg_name.len() < self.args.len() {
+			bail!(Error::MalformedArgs)
+		} else {
+			Ok(self)
+		}
+	}
+	pub fn new() -> Self {
+		Self {
+			arg_name: vec![],
+			args: vec![]
+		}
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Function {
-	arguments: Vec<Token>,
+	arguments: FunctionArgs,
 	instructions: Token,
 }
+
+
 
 macro_rules! insert_many {
 	{funct!$hashmap: expr,$($key:expr => $val:expr),*} => {
 		$(
-			$hashmap.insert($key.to_string(), Function { arguments: vec![], instructions: Token::Native($val) });
+			$hashmap.insert($key.to_string(), Function { arguments: FunctionArgs::new(), instructions: Token::Native($val) });
 		)*
 	};
 	{$hashmap: expr,$($key:expr => $val:expr),*} => {
@@ -411,17 +439,47 @@ macro_rules! insert_many {
 	};
 }
 
+macro_rules! try_or_bail {
+	($option: expr;$error:expr) => {
+		match $option {
+			Some(var) => var,
+			None => bail!($error)
+		}
+	};
+	($result: expr) => {
+		match $result {
+			Ok(var) => var,
+			Err(val) => bail!(val)
+		}
+	};
+	(m!$token:expr;$match_with:ident) => {
+		match $token {
+			$match_with(val) => val,Z
+			a => bail!(Error::UnexpectedToken(a))
+		}
+	};
+	(mo!$token:expr;$match_with:ident) => {
+		match $token {
+			Some($match_with(val)) => val,
+			None => bail!(Error::UnexpectedEOL)
+		}
+	}
+}
+
 pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 	let mut functions = HashMap::new();
 
 	insert_many! {
 		funct!functions,
-		"print" => |_, mut line| {
+		"print" => |vars, mut line| {
 			let mut to_print = String::new();
 
 			while let Some(arg) = line.next() {
 				match arg {
-					Token::VarAccessor(var) => to_print += "thus",
+					Token::VarAccessor(var) => to_print += &format!("{}", match vars.get(&var).clone() {
+						Some(any) => any,
+						None => bail!(Error::UnknownVar)
+					}),
 					Token::Array(arr) => to_print += &format!("{}", DisplayHandle(arr)),
 					Token::String(val) => to_print += &val,
 					Token::Bool(val) => to_print += &val.to_string(),
@@ -442,13 +500,23 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 			to_print = print_chars.collect();
 
 			println!("{}", to_print);
-			return Ok(line);
+			return Ok((vars, line));
 		},
-		"declare" => |_, mut line| {
+		"declare" => |mut vars, mut line| {
 			if let Some(Token::VarAccessor(name)) = line.next() {
-				
+				let var_token = match line.next() {
+					Some(Token::VarAccessor(any)) => vars.get(&any).unwrap().clone(),
+					Some(thing) => thing,
+					None => bail!(Error::UnexpectedEOL)
+				};
+				vars.insert(name, var_token);
 			}
-			return Ok(line)
+			
+			match line.next() {
+				Some(Token::LineEnd) => Ok((vars, line)),
+				Some(any) => bail!(Error::UnexpectedToken(any)),
+				None => bail!(Error::UnexpectedEOL)
+			}
 		}
 	};
 
@@ -463,11 +531,11 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 							ident,
 							Function {
 								arguments: if let Some(Token::Group(inner)) = tokens.next() {
-									inner
+									FunctionArgs { arg_name: inner, args: vec![] }
 								} else {
 									bail!(Error::ExpectedToken {
 										expected: Token::Group(vec![Token::Ident("Your function here".to_string())]),
-										found: tokens.next().unwrap()
+										found: Token::Ident(ident)
 									})
 								},
 								instructions: tokens.next().unwrap(),
@@ -486,13 +554,14 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 		}
 	}
 
-	match functions.get(&"main".to_string()) {
-		Some(_) => Ok(functions),
-		None => bail!(Error::NoMain),
-	}
+	try_or_bail!(functions.get(&"main".to_string()); Error::NoMain);
+
+	Ok(functions)
 }
 
 pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
+	let mut variables = HashMap::<String, Token>::new();
+
 	// Naming this variable "main" will overwrite the main fn
 	let shrimp_main = functions.get(&"main".to_string()).unwrap().clone();
 
@@ -507,16 +576,17 @@ pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
 						match functions.get(&name) {
 							Some(func) => {
 								match func.instructions.clone() {
-									Token::Native(fun) => match fun(func.arguments.clone(), instructions.clone()) {
-										Ok(iterator) => {
-											instructions = iterator
+									Token::Native(fun) => match fun(variables.clone(), instructions.clone()) {
+										Ok((vars, iterator)) => {
+											instructions = iterator;
+											variables = vars;
 										},
 										Err(err) => bail!(err)
 									}
 									any => bail!(Error::UnexpectedToken(any))
 								}
 							},
-							None => bail!(Error::UnexpectedToken(Token::Ident(name)))
+							None => bail!(Error::UnexpectedEOL)
 						}
 					}
 					x => bail!(Error::UnexpectedToken(x))
