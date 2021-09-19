@@ -16,5 +16,9 @@
 }
 
 @second (arg1 arg2) {
-	print "Greetings!"
+	print "Greetings!";
+}
+
+@arguments (arg1 arg2) {
+	print $arg1 $arg2;
 }
