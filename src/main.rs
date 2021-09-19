@@ -154,7 +154,7 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 
 				line.advance();
 
-				while let Some('a'..='z' | '_') = line.current_char {
+				while let Some('a'..='z' | '0'..='9' | '_') = line.current_char {
 					word.push(line.current_char.unwrap());
 					line.advance();
 				}
@@ -182,7 +182,7 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 							bail!(Error::UnexpectedEOL)
 						}
 						
-						if line.current_char == Some(current_quot) {
+						if line.current_char == Some(current_quot) || line.current_char == Some('\\') {
 							word.push(line.current_char.unwrap());
 						} else {
 							word.push('\\');
@@ -211,10 +211,11 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 			}
 			'a'..='z' | '_' => {
 				let mut word = String::new();
-				while let Some('a'..='z' | '_') = line.current_char {
+				while let Some('a'..='z' | '0'..='9' | '_') = line.current_char {
 					word.push(line.current_char.unwrap());
 					line.advance()
 				}
+				line.retreat();
 				tokens.push(Token::Ident(word));
 			}
 			'0'..='9' => {
@@ -586,8 +587,12 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 										Err(err) => bail!(err)
 									}
 									Token::Codeblock(code) => {
+										for i in func.arguments.arg_name.clone() {
+											println!("{}", i)
+										}
 										let out = try_or_bail!(execute(func.clone(), variables.clone(), functions.clone()));
 										// TODO: Once destructuring gets stabilized, use it here.
+										// TODO: Implement named arguments
 										variables = out.0;
 										functions = out.1;
 									},

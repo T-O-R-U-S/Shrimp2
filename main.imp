@@ -1,9 +1,9 @@
-@main (cmd_args) {
+@main(cmd_args) {
 	declare $var "Variable!";
 	/ This will declare a nameless variable
 	  that will return 0i32. /
 	print "Hello";
-	print "Hello \" world!";
+	print "Hello \ world!";
 	print "Hi!" 33;
 	print "Greetings!";
 	print $var;
@@ -15,10 +15,10 @@
 	second
 }
 
-@second (arg1 arg2) {
+@second(arg1 arg2) {
 	print "Greetings!";
 }
 
-@arguments (arg1 arg2) {
+@arguments(arg1 arg2) {
 	print $arg1 $arg2;
 }
