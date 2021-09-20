@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use anyhow::{anyhow, Result as anyErr};
+use anyhow::{anyhow, Result as Anyhow};
 
 macro_rules! bail {
 	($e: expr) => {
@@ -94,7 +94,7 @@ pub enum Token {
 			HashMap<String, Token>,
 			std::iter::Peekable<std::vec::IntoIter<Token>>,
 			HashMap<String, Function>
-		) -> anyErr<(
+		) -> Anyhow<(
 			HashMap<String, Token>,
 			std::iter::Peekable<std::vec::IntoIter<Token>>,
 			Option<Token>,
@@ -146,7 +146,7 @@ pub struct Lexer {
 	pub tokens: Vec<Token>,
 }
 
-pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
+pub fn make_tokens(mut line: Line) -> Anyhow<Vec<Token>> {
 	let mut tokens = Vec::new();
 
 	while let Some(curr_char) = line.current_char {
@@ -391,12 +391,12 @@ impl Lexer {
 			Some(self.line.chars().collect::<Vec<char>>()[self.pos as usize])
 		}
 	}
-	pub fn make_tokens(self) -> anyErr<Vec<Token>> {
+	pub fn make_tokens(self) -> Anyhow<Vec<Token>> {
 		make_tokens(Line::new(self.line, self.line_num))
 	}
 }
 
-fn main() -> anyErr<()> {
+fn main() -> Anyhow<()> {
 	let mut file = File::open("./main.imp")?;
 	let mut code = String::new();
 
@@ -416,7 +416,7 @@ pub struct FunctionArgs {
 }
 
 impl FunctionArgs {
-	pub fn validate(self) -> anyErr<Self> {
+	pub fn validate(self) -> Anyhow<Self> {
 		if self.arg_name.len() > self.args.len() || self.arg_name.len() < self.args.len() {
 			bail!(Error::MalformedArgs)
 		} else {
@@ -486,11 +486,11 @@ macro_rules! try_or_bail {
 	}
 }
 
-pub fn handle_group() {
-	
+pub fn handle_group(tok: Vec<Token>, vars: HashMap<String, Token>, funcs: HashMap<String, Function>) -> Anyhow<Option<Token>> {
+		Ok(execute(Function::new(Token::Codeblock(tok.clone())), vars.clone(), funcs.clone())?.2)
 }
 
-pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
+pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 	let mut functions = HashMap::new();
 
 	insert_many! {
@@ -508,7 +508,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 					Token::String(val) => to_print += &val,
 					Token::Bool(val) => to_print += &val.to_string(),
 					Token::Number(num) => to_print += &num.to_string(),
-					Token::Group(grp) => to_print += &execute(Function::new(Token::Codeblock(grp.clone())), vars.clone(), funcs.clone())?.2.unwrap().to_string(),
+					Token::Group(grp) => to_print += &handle_group(grp, vars.clone(), funcs.clone())?.unwrap().to_string(),
 					Token::FunctionDecl | Token::Codeblock(_) | Token::Ident(_) => bail!(Error::ExpectedToken {
 						expected: Token::String("Anything that can be displayed!".to_string()),
 						found: arg
@@ -602,7 +602,7 @@ pub fn execute(
 	func: Function,
 	mut variables: HashMap<String, Token>,
 	mut functions: HashMap<String, Function>,
-) -> anyErr<(
+) -> Anyhow<(
 	HashMap<String, Token>,
 	HashMap<String, Function>,
 	Option<Token>,
@@ -672,7 +672,7 @@ pub fn execute(
 	Ok((variables, functions, output))
 }
 
-pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
+pub fn run(functions: HashMap<String, Function>) -> Anyhow<()> {
 	let mut variables = HashMap::<String, Token>::new();
 
 	// Naming this variable "main" will overwrite the main fn
