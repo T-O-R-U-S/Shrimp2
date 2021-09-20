@@ -97,7 +97,7 @@ pub enum Token {
 	Codeblock(Vec<Token>),
 	Array(Vec<Token>),
 	VarAccessor(String),
-	Native(fn(HashMap<String, Token>, std::iter::Peekable<std::vec::IntoIter<Token>>) -> anyErr<(HashMap<String, Token>, std::iter::Peekable<std::vec::IntoIter<Token>>)>),
+	Native(fn(HashMap<String, Token>, std::iter::Peekable<std::vec::IntoIter<Token>>) -> anyErr<(HashMap<String, Token>, std::iter::Peekable<std::vec::IntoIter<Token>>, Option<Token>)>),
 }
 
 pub struct Line {
@@ -512,7 +512,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 			to_print = print_chars.collect();
 
 			println!("{}", to_print);
-			return Ok((vars, line));
+			return Ok((vars, line, None));
 		},
 		"declare" => |mut vars, mut line| {
 			if let Some(Token::VarAccessor(name)) = line.next() {
@@ -525,7 +525,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 			}
 			
 			match line.next() {
-				Some(Token::LineEnd) => Ok((vars, line)),
+				Some(Token::LineEnd) => Ok((vars, line, None)),
 				Some(any) => bail!(Error::UnexpectedToken(any)),
 				None => bail!(Error::UnexpectedEOL)
 			}
@@ -581,9 +581,10 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 							Some(func) => {
 								match func.instructions.clone() {
 									Token::Native(fun) => match fun(variables.clone(), instructions.clone()) {
-										Ok((vars, iterator)) => {
+										Ok((vars, iterator, out)) => {
 											instructions = iterator;
 											variables = vars;
+											output = out
 										},
 										Err(err) => bail!(err)
 									}
@@ -600,8 +601,6 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 												None => bail!(Error::UnexpectedEOL)
 											});
 										}
-
-										instructions.next();
 										if temp_vars.len() != func.arguments.arg_name.len() {
 											bail!(Error::MalformedArgs)
 										}
