@@ -712,6 +712,119 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 				Some(thing) => bail!(Error::UnexpectedToken(thing)),
 			}
 			Ok((vars,line, out))
+		},
+		"while" => |mut vars, mut line, funcs| {
+			let orig_token: Token;
+
+			let value = match line.next() {
+				Some(thing) => {
+					match thing {
+						Token::Bool(b) => { 
+							orig_token = Token::Bool(b);
+							b 
+						},
+						Token::VarAccessor(ref var) => match get!(vars;var.clone()) {
+							Token::Bool(b) => { 
+								orig_token = Token::VarAccessor(var.clone());
+								b
+							},
+							_ => bail!(Error::TypeMismatch)
+						},
+						Token::Group(grp) =>  { 
+						orig_token = Token::Group(grp.clone());
+						match try_or_bail!(handle_group(grp, vars.clone(), funcs.clone())?;Error::TypeMismatch) {
+							Token::Bool(b) => b,
+							any => bail!(Error::TypeMismatch)
+						}
+					}
+						any => bail!(Error::UnexpectedToken(any))
+					}
+				},
+				None => bail!(Error::UnexpectedEOL)
+			};
+			let to_loop = match line.next() {
+				Some(Token::Codeblock(code)) => Token::Codeblock(code),
+				Some(Token::LineEnd) | None => bail!(Error::UnexpectedEOL),
+				any => bail!(Error::UnexpectedToken(any.unwrap()))
+			};
+			while match orig_token {
+				Token::Bool(b) => b,
+				Token::VarAccessor(ref var) => match get!(vars;var.clone()) {
+					Token::Bool(b) => b,
+					any => bail!(Error::ParserError)
+				},
+				Token::Group(ref grp) => match try_or_bail!(handle_group(grp.clone(), vars.clone(), funcs.clone())?;Error::TypeMismatch) {
+					Token::Bool(b) => b,
+					any => bail!(Error::TypeMismatch)
+				},
+				any => bail!(Error::ParserError)
+			} { 
+				let out = execute(Function::new(to_loop.clone()), vars.clone(), funcs.clone())?;
+				vars = out.0;
+			}
+			Ok((vars, line, None))
+		},
+		"cmp_gr" => |vars, mut line, funcs| {
+			let first_val;
+			let second_val;
+
+			macro_rules! match_num {
+				($val: ident) => {
+					match line.next() {
+						Some(Token::Number(num)) => {
+							$val = num;
+						},
+						Some(Token::VarAccessor(var)) => match get!(vars;var) {
+							Token::Number(num) => $val = num,
+							any => bail!(Error::UnexpectedToken(any))
+						}
+						Some(Token::Group(grp)) => match try_or_bail!(handle_group(grp, vars.clone(), funcs.clone())?;Error::TypeMismatch) {
+							Token::Number(num) => $val = num,
+							any => bail!(Error::UnexpectedToken(any))
+						}
+						Some(any) => bail!(Error::UnexpectedToken(any)),
+						None => bail!(Error::UnexpectedEOL)
+					}
+				};
+			}
+
+			match_num!(first_val);
+
+			/*match line.next() {
+				Some(Token::Number(num)) => {
+					first_val = num;
+				},
+				Some(Token::VarAccessor(var)) => match get!(vars;var) {
+					Token::Number(num) => first_val = num,
+					any => bail!(Error::UnexpectedToken(any))
+				}
+				Some(Token::Group(grp)) => match try_or_bail!(handle_group(grp, vars.clone(), funcs.clone())?;Error::TypeMismatch) {
+					Token::Number(num) => first_val = num,
+					any => bail!(Error::UnexpectedToken(any))
+				}
+				Some(any) => bail!(Error::UnexpectedToken(any)),
+				None => bail!(Error::UnexpectedEOL)
+			}*/
+
+			/*match line.next() {
+				Some(Token::Number(num)) => {
+					second_val = num;
+				},
+				Some(Token::VarAccessor(var)) => match get!(vars;var) {
+					Token::Number(num) => second_val = num,
+					any => bail!(Error::UnexpectedToken(any))
+				}
+				Some(Token::Group(grp)) => match try_or_bail!(handle_group(grp, vars.clone(), funcs.clone())?;Error::TypeMismatch) {
+					Token::Number(num) => second_val = num,
+					any => bail!(Error::UnexpectedToken(any))
+				}
+				Some(any) => bail!(Error::UnexpectedToken(any)),
+				None => bail!(Error::UnexpectedEOL)
+			}*/
+
+			match_num!(second_val);
+
+			Ok((vars, line, Some(Token::Bool(first_val > second_val))))
 		}
 	};
 

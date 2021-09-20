@@ -1,23 +1,16 @@
 @main(cmd_args) {
-	declare $var "Variable!";
-	/ This will declare a nameless variable
-	  that will return 0i32. /
-	print "Hello";
-	print "Hello \ world!";
-	print "Hi!" 33;
-	print "Greetings!";
-	print $var;
-	print "Other";
-	print "Hello  world!" "Hello world!" [33 33 33 "Test"];
-	print "";
-	declare $hello_world "Test.";
-	print $hello_world;
-	second "Hello world" "test";
-	arguments "hi" "Hello!";
-	declare $hello (pow 3 3 3);
-	print $hello;
-	if(eq [33 33 33 "Test"] [33 33 33 "Test"] [33 33 33 "Test"]) {
-		print "Hello world!"
+	declare $count 0;
+	declare $count (add $count 2);
+
+	print $count;
+
+	declare $count 0;
+
+	print (cmp_gr 1000 $count);
+
+	while(cmp_gr 1000 $count) {
+		declare $count (add 1 $count);
+		print $count;
 	}
 }
 
