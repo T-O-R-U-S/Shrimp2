@@ -633,7 +633,7 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 				});
 			})
 		},
-		"eq" => |vars, mut line, _| {
+		"eq" => |vars, mut line, funcs| {
 			let mut proc = vec![];
 
 			while let Some(thing) = line.next() {
@@ -650,7 +650,13 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 			let mut proc = proc.iter();
 
 			while let Some(thing) = proc.next() {
-				if &f != thing {
+				let mut thing = thing.clone();
+				match thing.clone() {
+					Token::VarAccessor(var) => thing = get!(vars;var),
+					Token::Group(grp) => thing = try_or_bail!(handle_group(grp, vars.clone(), funcs.clone())?;Error::UnexpectedEOL),
+					_ => {}
+				};
+				if f != thing {
 					out = false;
 					break
 				}
@@ -661,6 +667,7 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 			Ok((vars, line, Some(Token::Bool(out))))
 		},
 		"if" => |mut vars, mut line, funcs| {
+			let mut out = None;
 			match line.next() {
 				Some(Token::Bool(val)) => 
 					match line.next() {
@@ -686,8 +693,9 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 									match thing {
 										Token::Codeblock(code) => {
 											if var {
-												let out = execute(Function::new(Token::Codeblock(code)), vars.clone(), funcs)?;
-												vars = out.0;
+												let outp = execute(Function::new(Token::Codeblock(code)), vars.clone(), funcs)?;
+												vars = outp.0;
+												out = outp.2;
 											}
 										}
 										any => bail!(Error::UnexpectedToken(any))
@@ -703,7 +711,7 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 				None | Some(Token::LineEnd) => bail!(Error::UnexpectedEOL),
 				Some(thing) => bail!(Error::UnexpectedToken(thing)),
 			}
-			Ok((vars,line, None))
+			Ok((vars,line, out))
 		}
 	};
 

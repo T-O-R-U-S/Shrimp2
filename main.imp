@@ -16,7 +16,7 @@
 	arguments "hi" "Hello!";
 	declare $hello (pow 3 3 3);
 	print $hello;
-	if(eq 2 2 2) {
+	if(eq [33 33 33 "Test"] [33 33 33 "Test"] [33 33 33 "Test"]) {
 		print "Hello world!"
 	}
 }
