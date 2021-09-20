@@ -530,9 +530,19 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 				None => bail!(Error::UnexpectedEOL)
 			}
 		},
-		"add" => |mut vars, mut line| {
+		"add" => |vars, mut line| {
+			let mut out = 0;
 			loop {
-				
+				match line.next() {
+					Some(Token::Number(num)) => out += num ,
+					Some(Token::VarAccessor(name)) => out += match vars.get(&name) {
+						Some(Token::Number(num)) => num,
+						Some(thing) => bail!(Error::UnexpectedToken(thing.clone())),
+						None => bail!(Error::UnexpectedEOL)
+					},
+					Some(thing) => bail!(Error::UnexpectedToken(thing)),
+					None => bail!(Error::UnexpectedEOL)
+				}
 			}
 		}
 	};
