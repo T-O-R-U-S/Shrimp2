@@ -14,6 +14,7 @@
 	print $hello_world;
 	second "Hello world" "test";
 	arguments "hi" "Hello!";
+	print (add 3 3 32 32);
 }
 
 @second(arg1 arg2) {

@@ -34,7 +34,7 @@ pub enum Error {
 	#[error("Unknown variable accessed")]
 	UnknownVar,
 	#[error("Incorrect amount of arguments provided")]
-	MalformedArgs
+	MalformedArgs,
 }
 
 impl std::fmt::Display for Token {
@@ -49,12 +49,16 @@ impl std::fmt::Display for Token {
 				}
 
 				write!(f, "{}", to_write)
-			},
+			}
 			Token::Ident(val) => write!(f, "{}", val),
 			Token::String(val) => write!(f, "{}", val),
 			Token::Number(num) => write!(f, "{}", num),
 			Token::Bool(val) => write!(f, "{}", val),
-			Token::LineEnd | Token::FunctionDecl | Token::Native(_) | Token::Codeblock(_) | Token::Group(_) => write!(f, "{:?}", self)
+			Token::LineEnd
+			| Token::FunctionDecl
+			| Token::Native(_)
+			| Token::Codeblock(_)
+			| Token::Group(_) => write!(f, "{:?}", self),
 		}
 	}
 }
@@ -97,7 +101,17 @@ pub enum Token {
 	Codeblock(Vec<Token>),
 	Array(Vec<Token>),
 	VarAccessor(String),
-	Native(fn(HashMap<String, Token>, std::iter::Peekable<std::vec::IntoIter<Token>>) -> anyErr<(HashMap<String, Token>, std::iter::Peekable<std::vec::IntoIter<Token>>, Option<Token>)>),
+	Native(
+		fn(
+			HashMap<String, Token>,
+			std::iter::Peekable<std::vec::IntoIter<Token>>,
+			HashMap<String, Function>
+		) -> anyErr<(
+			HashMap<String, Token>,
+			std::iter::Peekable<std::vec::IntoIter<Token>>,
+			Option<Token>,
+		)>,
+	),
 }
 
 pub struct Line {
@@ -181,7 +195,6 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 						if line.current_char.is_none() {
 							bail!(Error::UnexpectedEOL)
 						}
-						
 						if line.current_char == Some(current_quot) || line.current_char == Some('\\') {
 							word.push(line.current_char.unwrap());
 						} else {
@@ -189,7 +202,7 @@ pub fn make_tokens(mut line: Line) -> anyErr<Vec<Token>> {
 							word.push(line.current_char.unwrap())
 						}
 						line.advance();
-						continue
+						continue;
 					}
 
 					word.push(line.current_char.unwrap());
@@ -411,7 +424,7 @@ fn main() -> anyErr<()> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FunctionArgs {
 	arg_name: Vec<Token>,
-	args: Vec<Token>
+	args: Vec<Token>,
 }
 
 impl FunctionArgs {
@@ -425,7 +438,7 @@ impl FunctionArgs {
 	pub fn new() -> Self {
 		Self {
 			arg_name: vec![],
-			args: vec![]
+			args: vec![],
 		}
 	}
 }
@@ -436,7 +449,14 @@ pub struct Function {
 	instructions: Token,
 }
 
-
+impl Function {
+	pub fn new(instructions: Token) -> Self {
+		Function {
+			arguments: FunctionArgs::new(),
+			instructions,
+		}
+	}
+}
 
 macro_rules! insert_many {
 	{funct;$hashmap: expr,$($key:expr => $val:expr),*} => {
@@ -483,7 +503,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 
 	insert_many! {
 		funct;functions,
-		"print" => |vars, mut line| {
+		"print" => |vars, mut line, funcs| {
 			let mut to_print = String::new();
 
 			while let Some(arg) = line.next() {
@@ -496,12 +516,13 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 					Token::String(val) => to_print += &val,
 					Token::Bool(val) => to_print += &val.to_string(),
 					Token::Number(num) => to_print += &num.to_string(),
-					Token::FunctionDecl | Token::Codeblock(_) | Token::Ident(_) | Token::Group(_) => bail!(Error::ExpectedToken {
+					Token::Group(grp) => to_print += &execute(Function::new(Token::Codeblock(grp.clone())), vars.clone(), funcs.clone())?.2.unwrap().to_string(),
+					Token::FunctionDecl | Token::Codeblock(_) | Token::Ident(_) => bail!(Error::ExpectedToken {
 						expected: Token::String("Anything that can be displayed!".to_string()),
 						found: arg
 					}),
 					Token::Native(_) => bail!(Error::ParserError),
-					Token::LineEnd => break 
+					Token::LineEnd => break
 				}
 				to_print += " "
 			}
@@ -514,7 +535,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 			println!("{}", to_print);
 			return Ok((vars, line, None));
 		},
-		"declare" => |mut vars, mut line| {
+		"declare" => |mut vars, mut line, _| {
 			if let Some(Token::VarAccessor(name)) = line.next() {
 				let var_token = match line.next() {
 					Some(Token::VarAccessor(any)) => vars.get(&any).unwrap().clone(),
@@ -523,14 +544,13 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 				};
 				vars.insert(name, var_token);
 			}
-			
 			match line.next() {
 				Some(Token::LineEnd) => Ok((vars, line, None)),
 				Some(any) => bail!(Error::UnexpectedToken(any)),
 				None => bail!(Error::UnexpectedEOL)
 			}
 		},
-		"add" => |vars, mut line| {
+		"add" => |vars, mut line, _| {
 			let mut out = 0;
 			loop {
 				match line.next() {
@@ -540,6 +560,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 						Some(thing) => bail!(Error::UnexpectedToken(thing.clone())),
 						None => bail!(Error::UnexpectedEOL)
 					},
+					Some(Token::LineEnd) => return Ok((vars, line, Some(Token::Number(out)))),
 					Some(thing) => bail!(Error::UnexpectedToken(thing)),
 					None => bail!(Error::UnexpectedEOL)
 				}
@@ -557,11 +578,13 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 						functions.insert(
 							ident,
 							Function {
-								arguments:
-								match tokens.next() {
-									Some(Token::Group(inner)) => FunctionArgs { arg_name: inner, args: vec![] },
+								arguments: match tokens.next() {
+									Some(Token::Group(inner)) => FunctionArgs {
+										arg_name: inner,
+										args: vec![],
+									},
 									Some(token) => bail!(Error::UnexpectedToken(token)),
-									None => bail!(Error::UnexpectedEOL)
+									None => bail!(Error::UnexpectedEOL),
 								},
 								instructions: tokens.next().unwrap(),
 							},
@@ -584,7 +607,15 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 	Ok(functions)
 }
 
-pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functions: HashMap<String, Function>) -> anyErr<(HashMap<String, Token>, HashMap<String, Function>, Option<Token>)> {
+pub fn execute(
+	func: Function,
+	mut variables: HashMap<String, Token>,
+	mut functions: HashMap<String, Function>,
+) -> anyErr<(
+	HashMap<String, Token>,
+	HashMap<String, Function>,
+	Option<Token>,
+)> {
 	let mut output = None;
 	match func.instructions {
 		Token::Codeblock(val) => {
@@ -595,14 +626,14 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 						match functions.get(&name) {
 							Some(func) => {
 								match func.instructions.clone() {
-									Token::Native(fun) => match fun(variables.clone(), instructions.clone()) {
+									Token::Native(fun) => match fun(variables.clone(), instructions.clone(), functions.clone()) {
 										Ok((vars, iterator, out)) => {
 											instructions = iterator;
 											variables = vars;
 											output = out
-										},
-										Err(err) => bail!(err)
-									}
+										}
+										Err(err) => bail!(err),
+									},
 									Token::Codeblock(_) => {
 										let mut temp_vars = vec![];
 
@@ -610,17 +641,21 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 
 										for i in func.arguments.arg_name.clone() {
 											temp_vars.push(i.to_string().clone());
-											variables.insert(i.to_string(), match instructions.next() {
-												Some(Token::LineEnd) => bail!(Error::UnexpectedEOL),
-												Some(thing) => thing,
-												None => bail!(Error::UnexpectedEOL)
-											});
+											variables.insert(
+												i.to_string(),
+												match instructions.next() {
+													Some(Token::LineEnd) => bail!(Error::UnexpectedEOL),
+													Some(thing) => thing,
+													None => bail!(Error::UnexpectedEOL),
+												},
+											);
 										}
 										if temp_vars.len() != func.arguments.arg_name.len() {
 											bail!(Error::MalformedArgs)
 										}
 										instructions.next();
-										let out = try_or_bail!(execute(func.clone(), variables.clone(), functions.clone()));
+										let out =
+											try_or_bail!(execute(func.clone(), variables.clone(), functions.clone()));
 										// TODO: Once destructuring gets stabilized, use it here.
 										variables = out.0;
 										functions = out.1;
@@ -628,18 +663,18 @@ pub fn execute(func: Function, mut variables: HashMap<String,Token>, mut functio
 										for i in temp_vars {
 											variables.remove(&i);
 										}
-									},
-									any => bail!(Error::UnexpectedToken(any))
+									}
+									any => bail!(Error::UnexpectedToken(any)),
 								}
-							},
-							None => bail!(Error::UnexpectedEOL)
+							}
+							None => bail!(Error::UnexpectedEOL),
 						}
 					}
-					x => bail!(Error::UnexpectedToken(x))
+					x => bail!(Error::UnexpectedToken(x)),
 				}
 			}
 		}
-		any => bail!(Error::UnexpectedToken(any))
+		any => bail!(Error::UnexpectedToken(any)),
 	}
 
 	Ok((variables, functions, output))
@@ -655,7 +690,7 @@ pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
 
 	match execute(shrimp_main, variables, functions) {
 		Ok(_) => Ok(()),
-		Err(any) => bail!(any)
+		Err(any) => bail!(any),
 	}
 
 	/*match shrimp_main.instructions {
@@ -675,7 +710,6 @@ pub fn run(functions: HashMap<String, Function>) -> anyErr<()> {
 										Err(err) => bail!(err)
 									}
 									Token::Codeblock(code) => {
-										
 									}
 									any => bail!(Error::UnexpectedToken(any))
 								}
