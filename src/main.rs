@@ -439,7 +439,7 @@ pub struct Function {
 
 
 macro_rules! insert_many {
-	{funct!$hashmap: expr,$($key:expr => $val:expr),*} => {
+	{funct;$hashmap: expr,$($key:expr => $val:expr),*} => {
 		$(
 			$hashmap.insert($key.to_string(), Function { arguments: FunctionArgs::new(), instructions: Token::Native($val) });
 		)*
@@ -482,7 +482,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 	let mut functions = HashMap::new();
 
 	insert_many! {
-		funct!functions,
+		funct;functions,
 		"print" => |vars, mut line| {
 			let mut to_print = String::new();
 
@@ -528,6 +528,11 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 				Some(Token::LineEnd) => Ok((vars, line, None)),
 				Some(any) => bail!(Error::UnexpectedToken(any)),
 				None => bail!(Error::UnexpectedEOL)
+			}
+		},
+		"add" => |mut vars, mut line| {
+			loop {
+				
 			}
 		}
 	};
