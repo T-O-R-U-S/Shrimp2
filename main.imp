@@ -14,11 +14,16 @@
 	print $hello_world;
 	second "Hello world" "test";
 	arguments "hi" "Hello!";
-	print (add 3 3 32 32);
+	declare $hello (pow 3 3 3);
+	print $hello;
+	if(eq 2 2 2) {
+		print "Hello world!"
+	}
 }
 
 @second(arg1 arg2) {
 	print $arg1 $arg2;
+	add 3 3
 }
 
 @arguments(arg1 arg2) {

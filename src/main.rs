@@ -35,6 +35,8 @@ pub enum Error {
 	UnknownVar,
 	#[error("Incorrect amount of arguments provided")]
 	MalformedArgs,
+	#[error("Incorrect type")]
+	TypeMismatch,
 }
 
 impl std::fmt::Display for Token {
@@ -93,7 +95,7 @@ pub enum Token {
 		fn(
 			HashMap<String, Token>,
 			std::iter::Peekable<std::vec::IntoIter<Token>>,
-			HashMap<String, Function>
+			HashMap<String, Function>,
 		) -> Anyhow<(
 			HashMap<String, Token>,
 			std::iter::Peekable<std::vec::IntoIter<Token>>,
@@ -219,8 +221,13 @@ pub fn make_tokens(mut line: Line) -> Anyhow<Vec<Token>> {
 				line.retreat();
 				tokens.push(Token::Ident(word));
 			}
-			'0'..='9' => {
+			'0'..='9' | '-' => {
 				let mut num = String::new();
+
+				if Some('-') == line.current_char {
+					num.push('-');
+					line.advance();
+				}
 
 				while let Some('0'..='9') = line.current_char {
 					num.push(line.current_char.unwrap());
@@ -486,8 +493,58 @@ macro_rules! try_or_bail {
 	}
 }
 
-pub fn handle_group(tok: Vec<Token>, vars: HashMap<String, Token>, funcs: HashMap<String, Function>) -> Anyhow<Option<Token>> {
-		Ok(execute(Function::new(Token::Codeblock(tok.clone())), vars.clone(), funcs.clone())?.2)
+pub fn handle_group(
+	tok: Vec<Token>,
+	vars: HashMap<String, Token>,
+	funcs: HashMap<String, Function>,
+) -> Anyhow<Option<Token>> {
+	Ok(
+		execute(
+			Function::new(Token::Codeblock(tok.clone())),
+			vars.clone(),
+			funcs.clone(),
+		)?
+		.2,
+	)
+}
+
+macro_rules! get {
+	($vars: expr;$var_name: expr) => {
+		match $vars.get(&$var_name) {
+			Some(var) => var.clone(),
+			None => bail!(Error::UnknownVar),
+		}
+	};
+}
+
+pub fn math(
+	funcs: HashMap<String, Function>,
+	mut line: std::iter::Peekable<std::vec::IntoIter<Token>>, vars: HashMap<String, Token>, op: fn(&mut i32, i32)) -> Anyhow<(
+	HashMap<String,Token>,
+	std::iter::Peekable<std::vec::IntoIter<Token>>,
+	Option<Token>
+)> {
+	let mut out = match line.next() {
+		Some(Token::Number(num)) => num,
+		Some(Token::VarAccessor(var)) => match get!(vars;var) {
+			Token::Number(num) => num,
+			any => bail!(Error::UnexpectedToken(any))
+		},
+		Some(Token::LineEnd) | None => bail!(Error::UnexpectedEOL),
+		Some(thing) => bail!(Error::UnexpectedToken(thing))
+	};
+	loop {
+		match line.next() {
+			Some(Token::Number(num)) => op(&mut out, num),
+			Some(Token::VarAccessor(name)) => op(&mut out, match vars.get(&name) {
+				Some(Token::Number(num)) => num.clone(),
+				Some(thing) => bail!(Error::UnexpectedToken(thing.clone())),
+				None => bail!(Error::UnexpectedEOL)
+			}),
+			Some(Token::LineEnd) | None => return Ok((vars, line, Some(Token::Number(out)))),
+			Some(thing) => bail!(Error::UnexpectedToken(thing)),
+		}
+	}
 }
 
 pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
@@ -500,10 +557,7 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 
 			while let Some(arg) = line.next() {
 				match arg {
-					Token::VarAccessor(var) => to_print += &format!("{}", match vars.get(&var).clone() {
-						Some(any) => any,
-						None => bail!(Error::UnknownVar)
-					}),
+					Token::VarAccessor(var) => to_print += &format!("{}", get!(vars;var)),
 					Token::Array(arr) => to_print += &format!("{}", DisplayHandle(arr)),
 					Token::String(val) => to_print += &val,
 					Token::Bool(val) => to_print += &val.to_string(),
@@ -527,10 +581,11 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 			println!("{}", to_print);
 			return Ok((vars, line, None));
 		},
-		"declare" => |mut vars, mut line, _| {
+		"declare" => |mut vars, mut line, funcs| {
 			if let Some(Token::VarAccessor(name)) = line.next() {
 				let var_token = match line.next() {
-					Some(Token::VarAccessor(any)) => vars.get(&any).unwrap().clone(),
+					Some(Token::VarAccessor(var)) => get!(vars;var),
+					Some(Token::Group(grp)) => try_or_bail!(handle_group(grp, vars.clone(), funcs)?;Error::TypeMismatch),
 					Some(thing) => thing,
 					None => bail!(Error::UnexpectedEOL)
 				};
@@ -542,20 +597,113 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 				None => bail!(Error::UnexpectedEOL)
 			}
 		},
-		"add" => |vars, mut line, _| {
-			let mut out = 0;
-			loop {
-				match line.next() {
-					Some(Token::Number(num)) => out += num ,
-					Some(Token::VarAccessor(name)) => out += match vars.get(&name) {
-						Some(Token::Number(num)) => num,
-						Some(thing) => bail!(Error::UnexpectedToken(thing.clone())),
-						None => bail!(Error::UnexpectedEOL)
-					},
-					Some(Token::LineEnd) | None => return Ok((vars, line, Some(Token::Number(out)))),
-					Some(thing) => bail!(Error::UnexpectedToken(thing)),
+		"add" => |vars, line, funcs| {
+			math(funcs, line, vars, |num1, num2| {
+				*num1 += num2
+			})
+		},
+		"sub" => |vars, line, funcs| {
+			math(funcs, line, vars, |num1, num2| {
+				*num1 -= num2
+			})
+		},
+		"mul" => |vars, line, funcs| {
+			math(funcs, line, vars, |num1, num2| {
+				*num1 *= num2
+			})
+		},
+		"div" => |vars, line, funcs| {
+			math(funcs, line, vars, |num1, num2| {
+				*num1 /= num2
+			})
+		},
+		"xor" => |vars, line, funcs| {
+			math(funcs, line, vars, |num1, num2| {
+				*num1 ^= num2
+			})
+		},
+		"pow" => |vars, line, funcs| {
+			math(funcs, line, vars, |num1, num2| {
+				*num1 = num1.pow(match num2 {
+					mut n if n.is_negative() => {
+						n *= -1;
+						n as u32
+					}
+					n => n as u32
+				});
+			})
+		},
+		"eq" => |vars, mut line, _| {
+			let mut proc = vec![];
+
+			while let Some(thing) = line.next() {
+				if thing == Token::LineEnd {
+					break
+				}
+				proc.push(thing)
+			}
+
+			let mut out = true;
+
+			let f = proc[0].clone();
+
+			let mut proc = proc.iter();
+
+			while let Some(thing) = proc.next() {
+				if &f != thing {
+					out = false;
+					break
 				}
 			}
+
+
+
+			Ok((vars, line, Some(Token::Bool(out))))
+		},
+		"if" => |mut vars, mut line, funcs| {
+			match line.next() {
+				Some(Token::Bool(val)) => 
+					match line.next() {
+						Some(thing) => {
+							match thing {
+								Token::Codeblock(code) => {
+									if val {
+										let out = execute(Function::new(Token::Codeblock(code)), vars.clone(), funcs)?;
+										vars = out.0;
+									}
+								}
+								any => bail!(Error::UnexpectedToken(any))
+							}
+						},
+						None => bail!(Error::UnexpectedEOL)
+				},
+				Some(Token::VarAccessor(var)) => { get!(vars;var); },
+				Some(Token::Group(grp)) => { match try_or_bail!(handle_group(grp, vars.clone(), funcs.clone())?;Error::TypeMismatch) {
+					Token::Bool(var) => {
+						if var {
+							match line.next() {
+								Some(thing) => {
+									match thing {
+										Token::Codeblock(code) => {
+											if var {
+												let out = execute(Function::new(Token::Codeblock(code)), vars.clone(), funcs)?;
+												vars = out.0;
+											}
+										}
+										any => bail!(Error::UnexpectedToken(any))
+									}
+								},
+								None => bail!(Error::UnexpectedEOL)
+						}
+						}
+					}
+					Token::LineEnd => bail!(Error::UnexpectedEOL),
+					_ => { bail!(Error::TypeMismatch) }
+				} },
+				None | Some(Token::LineEnd) => bail!(Error::UnexpectedEOL),
+				Some(thing) => bail!(Error::UnexpectedToken(thing)),
+			}
+			Ok((vars,line, None))
 		}
 	};
 
@@ -617,14 +765,16 @@ pub fn execute(
 						match functions.get(&name) {
 							Some(func) => {
 								match func.instructions.clone() {
-									Token::Native(fun) => match fun(variables.clone(), instructions.clone(), functions.clone()) {
-										Ok((vars, iterator, out)) => {
-											instructions = iterator;
-											variables = vars;
-											output = out
+									Token::Native(fun) => {
+										match fun(variables.clone(), instructions.clone(), functions.clone()) {
+											Ok((vars, iterator, out)) => {
+												instructions = iterator;
+												variables = vars;
+												output = out
+											}
+											Err(err) => bail!(err),
 										}
-										Err(err) => bail!(err),
-									},
+									}
 									Token::Codeblock(_) => {
 										let mut temp_vars = vec![];
 
