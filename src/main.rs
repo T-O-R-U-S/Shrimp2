@@ -77,18 +77,6 @@ impl std::fmt::Display for DisplayHandle<Vec<Token>> {
 	}
 }
 
-impl Error {
-	pub fn handle_default(&self) {
-		println!("{}", self);
-		std::process::exit(1)
-	}
-	pub fn handle(&self) {
-		match self {
-			_ => self.handle_default(),
-		}
-	}
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
 	LineEnd,
@@ -498,6 +486,10 @@ macro_rules! try_or_bail {
 	}
 }
 
+pub fn handle_group() {
+	
+}
+
 pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 	let mut functions = HashMap::new();
 
@@ -560,9 +552,8 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 						Some(thing) => bail!(Error::UnexpectedToken(thing.clone())),
 						None => bail!(Error::UnexpectedEOL)
 					},
-					Some(Token::LineEnd) => return Ok((vars, line, Some(Token::Number(out)))),
+					Some(Token::LineEnd) | None => return Ok((vars, line, Some(Token::Number(out)))),
 					Some(thing) => bail!(Error::UnexpectedToken(thing)),
-					None => bail!(Error::UnexpectedEOL)
 				}
 			}
 		}
@@ -596,7 +587,7 @@ pub fn funcs(tokens: Vec<Token>) -> anyErr<HashMap<String, Function>> {
 						})
 					}
 				}
-				_ => Error::OutOfFunction.handle(),
+				_ => bail!(Error::OutOfFunction),
 			},
 			None => std::process::exit(0),
 		}
@@ -674,6 +665,7 @@ pub fn execute(
 				}
 			}
 		}
+		Token::LineEnd => {}
 		any => bail!(Error::UnexpectedToken(any)),
 	}
 
