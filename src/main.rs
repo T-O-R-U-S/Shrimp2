@@ -538,6 +538,10 @@ pub fn math(
 			Some(Token::Number(num)) => op(&mut out, num),
 			Some(Token::VarAccessor(name)) => op(&mut out, match vars.get(&name) {
 				Some(Token::Number(num)) => *num,
+				Some(Token::Group(grp)) => match try_or_bail!(handle_group(grp.to_owned(), vars.to_owned(), funcs.to_owned())?; Error::TypeMismatch) {
+					Token::Number(num) => num,
+					any => bail!(Error::UnexpectedToken(any))
+				},
 				Some(thing) => bail!(Error::UnexpectedToken(thing.to_owned())),
 				None => bail!(Error::UnexpectedEOL)
 			}),
@@ -645,9 +649,9 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 
 			let mut out = true;
 
-			let f = proc[0].to_owned();
-
 			let mut proc = proc.iter();
+
+			let f = try_or_bail!(proc.next(); Error::UnexpectedEOL);
 
 			while let Some(thing) = proc.next() {
 				let mut thing = thing.to_owned();
@@ -656,11 +660,13 @@ pub fn funcs(tokens: Vec<Token>) -> Anyhow<HashMap<String, Function>> {
 					Token::Group(grp) => thing = try_or_bail!(handle_group(grp, vars.to_owned(), funcs.to_owned())?;Error::UnexpectedEOL),
 					_ => {}
 				};
-				if f != thing {
+				if f != &thing {
 					out = false;
 					break
 				}
 			}
+
+			
 
 
 
@@ -944,7 +950,7 @@ pub fn execute(
 }
 
 pub fn run(functions: HashMap<String, Function>) -> Anyhow<()> {
-	let mut variables = HashMap::<String, Token>::new();
+	let variables = HashMap::<String, Token>::new();
 
 	// Naming this variable "main" will overwrite the main fn
 	let shrimp_main = functions.get(&"main".to_string()).unwrap().to_owned();
@@ -989,3 +995,4 @@ pub fn run(functions: HashMap<String, Function>) -> Anyhow<()> {
 
 	Ok(())*/
 }
+

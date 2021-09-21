@@ -1,6 +1,6 @@
 @main(cmd_args) {
 	declare $count 0;
-	while (cmp_gr 1000 $count) {
+	while (cmp_gr 100000 $count) {
 		print $count;
 		declare $count (add $count 1);
 	}

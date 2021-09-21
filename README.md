@@ -6,6 +6,8 @@ Mild syntactic differences, if you want to check those out, you might want to ta
 
 Currently, the main concern is making ShrimpLang 2 turning complete -- after that, comes bringing it up to spec with ShrimpLang 1
 
-## Update, it's turing complete
+## Update, it's turing complete -- up next, array manipulation (but first I need to optimize this spaghetti)!
 
-It's also slower than Python. I ran a benchmark to check. This is a sad day for the Shrimp people (but also unexpected. Why'd you think I ran a benchmark!? The code is spaghetti!)
+It's also ~10x slower than Python. I ran a benchmark to check. This is a sad day for the Shrimp people (but also unexpected. Why'd you think I ran a benchmark!? The code is spaghetti! :()
+
+For now, I plan to focus on getting rid of all of the deep cloning that is happening, because it is a massive detriment to performance. There are also probably other places to optimize.
