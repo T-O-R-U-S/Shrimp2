@@ -1,16 +1,8 @@
 @main(cmd_args) {
 	declare $count 0;
-	declare $count (add $count 2);
-
-	print $count;
-
-	declare $count 0;
-
-	print (cmp_gr 1000 $count);
-
-	while(cmp_gr 1000 $count) {
-		declare $count (add 1 $count);
+	while (cmp_gr 1000 $count) {
 		print $count;
+		declare $count (add $count 1);
 	}
 }
 
