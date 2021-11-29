@@ -1,4 +1,4 @@
-# ShrimpLang 2.0
+# ShrimpLang 2.0 (DEPRACATED, go to [Shrimp3](https://github.com/T-O-R-U-S/shrimp3)!)
 
 A rewrite of the original shrimp, but hopefully done right this time.
 
